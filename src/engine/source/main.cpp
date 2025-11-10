@@ -378,7 +378,7 @@ int main(int argc, char* argv[])
 
             try {
                 const auto jsonCnf = isRunningStandAlone ? standAloneConfig() : base::libwazuhshared::getJsonIndexerCnf();
-                indexerConnector = wiconnector::ConnectorFactory::createConnector(jsonCnf);
+                indexerConnector = wiconnector::ConnectorFactory::createConnector(std::string_view(jsonCnf));
 
                 // Determine connector type for logging
                 const auto config = nlohmann::json::parse(jsonCnf);
