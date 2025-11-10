@@ -67,6 +67,7 @@ WORKDIR /build
 COPY src/ /build/src/
 COPY etc/ /build/etc/
 COPY framework/ /build/framework/
+COPY VERSION.json /build/
 COPY install.sh /build/
 COPY gen_ossec.sh /build/
 COPY add_localfiles.sh /build/
