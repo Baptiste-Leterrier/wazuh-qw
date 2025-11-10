@@ -1369,7 +1369,9 @@ endif
 INDEXER_TEMPLATE_FILES := $(INDEXER_TEMPLATES_STATES:%=$(INDEXER_PLUGINS_DIR)/%) $(INDEXER_TEMPLATES_STREAMS:%=$(INDEXER_PLUGINS_DIR)/%)
 
 .PHONY: deps
-deps: $(EXTERNAL_TAR) $(SHARED_TAR) $(INDEXER_TEMPLATE_FILES)
+deps: $(EXTERNAL_TAR) $(SHARED_TAR)
+	@# Download indexer templates if possible (optional - only needed for OpenSearch/Indexer)
+	@$(MAKE) $(INDEXER_TEMPLATE_FILES) 2>/dev/null || echo "Note: Indexer plugin templates not downloaded (only needed for OpenSearch/Indexer support)"
 
 external/$(CPYTHON).tar.gz:
 # Python interpreter
