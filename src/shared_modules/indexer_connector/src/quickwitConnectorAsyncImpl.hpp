@@ -85,6 +85,7 @@ public:
 
 using ThreadDispatchQueue = ThreadEventDispatcher<std::string, std::function<void(std::queue<std::string>&)>>;
 using ThreadLoggerQueue = Utils::AsyncValueDispatcher<QuickwitResponse, std::function<void(QuickwitResponse&&)>>;
+using PerIndexDispatcher = ThreadEventDispatcher<std::string, std::function<void(std::queue<std::string>&)>>;
 
 template<typename TSelector,
          typename THttpRequest,
@@ -105,7 +106,7 @@ class QuickwitConnectorAsyncImpl final
     std::unique_ptr<ThreadDispatchQueue> m_dispatcher;
     std::string m_databasePath;
     std::mutex m_indexMutex;
-    std::map<std::string, std::shared_ptr<Utils::AsyncValueDispatcher<std::string, std::function<void(std::queue<std::string>&)>>>> m_indexDispatchers;
+    std::map<std::string, std::shared_ptr<PerIndexDispatcher>> m_indexDispatchers;
 
 public:
     ~QuickwitConnectorAsyncImpl()
@@ -309,7 +310,7 @@ public:
     }
 
 private:
-    std::shared_ptr<Utils::AsyncValueDispatcher<std::string, std::function<void(std::queue<std::string>&)>>>
+    std::shared_ptr<PerIndexDispatcher>
     getOrCreateDispatcher(const std::string& index)
     {
         std::lock_guard lock(m_indexMutex);
@@ -320,12 +321,15 @@ private:
             return it->second;
         }
 
-        // Create new dispatcher for this index
-        auto dispatcher = std::make_shared<Utils::AsyncValueDispatcher<std::string, std::function<void(std::queue<std::string>&)>>>(
+        // Create new dispatcher for this index with batching support
+        auto dispatcher = std::make_shared<PerIndexDispatcher>(
             [this, index](std::queue<std::string>& dataQueue)
             {
                 processIndexQueue(index, dataQueue);
             },
+            m_databasePath + "/" + index,
+            ElementsPerBulk,
+            UNLIMITED_QUEUE_SIZE,
             FlushInterval);
 
         m_indexDispatchers[index] = dispatcher;
