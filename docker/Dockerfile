@@ -135,7 +135,7 @@ RUN set -ex && \
     echo "========================================" && \
     echo "Installing Wazuh Framework..." && \
     echo "========================================" && \
-    make install_framework INSTALLDIR=/var/ossec WAZUH_GROUP=ossec || { \
+    make install_framework INSTALLDIR=/var/ossec WAZUH_GROUP=wazuh || { \
         echo "ERROR: Framework installation failed"; \
         exit 1; \
     } && \
@@ -144,7 +144,7 @@ RUN set -ex && \
     echo "Installing Wazuh API..." && \
     echo "========================================" && \
     cd /build/api && \
-    make install INSTALLDIR=/var/ossec WAZUH_GROUP=ossec || { \
+    make install INSTALLDIR=/var/ossec WAZUH_GROUP=wazuh || { \
         echo "ERROR: API installation failed"; \
         exit 1; \
     } && \
