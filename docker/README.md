@@ -2,6 +2,16 @@
 
 This directory contains everything needed to run Wazuh with Quickwit support in Docker containers.
 
+## ⚠️ Build Failing? Start Here!
+
+If your Docker build is failing:
+
+1. **See detailed step-by-step guide:** [DEBUG_BUILD_FAILURE.md](DEBUG_BUILD_FAILURE.md)
+2. **Run error diagnostic:** `./get-build-error.sh`
+3. **Try minimal Dockerfile:** `cp Dockerfile.minimal Dockerfile`
+4. **Quick troubleshooting:** [QUICK_FIX.md](QUICK_FIX.md)
+5. **Comprehensive guide:** [DOCKER_BUILD_TROUBLESHOOTING.md](DOCKER_BUILD_TROUBLESHOOTING.md)
+
 ## Quick Start
 
 ```bash
