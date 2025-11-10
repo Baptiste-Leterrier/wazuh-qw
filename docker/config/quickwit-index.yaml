@@ -55,25 +55,12 @@ doc_mapping:
       tokenizer: default
       indexed: true
 
-    - name: rule.groups
-      type: text
-      tokenizer: raw
-      fast: true
-
     - name: rule.firedtimes
       type: u64
       fast: true
 
     - name: rule.mail
       type: bool
-
-    - name: rule.pci_dss
-      type: text
-      tokenizer: raw
-
-    - name: rule.gdpr
-      type: text
-      tokenizer: raw
 
     - name: rule.hipaa
       type: text
@@ -213,6 +200,22 @@ doc_mapping:
     - name: GeoLocation.location
       type: text
       tokenizer: raw
+      
+    - name: rule
+      type: object
+      field_mappings:
+        - name: groups
+          type: text
+          tokenizer: raw
+          fast: true
+        - name: pci_dss
+          type: text
+          tokenizer: raw
+          fast: true
+        - name: gdpr
+          type: text
+          tokenizer: raw
+          fast: true
 
   # Set timestamp as the primary timestamp field
   timestamp_field: timestamp
@@ -221,10 +224,13 @@ doc_mapping:
   mode: dynamic
 
   # Tag fields (for categorization)
-  tag_fields:
-    - rule.groups
-    - rule.pci_dss
-    - rule.gdpr
+  #tag_fields:
+  #  - rule.groups
+  #  - rule.pci_dss
+  #  - rule.gdpr
+  tag_fields: ["rule.groups", "rule.pci_dss", "rule.gdpr"]
+
+
 
 # Indexing settings
 indexing_settings:
@@ -236,7 +242,7 @@ indexing_settings:
     type: stable_log
     merge_factor: 10
     max_merge_factor: 12
-    max_merge_ops: 4
+    maturation_period: 48h
 
   # Resource limits
   resources:

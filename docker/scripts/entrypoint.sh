@@ -31,7 +31,8 @@ log_error() {
 WAZUH_HOME=${WAZUH_HOME:-/var/ossec}
 
 # Configuration
-QUICKWIT_HOST=${QUICKWIT_HOST:-quickwit-server}
+#QUICKWIT_HOST=${QUICKWIT_HOST:-quickwit-server}
+QUICKWIT_HOST="172.25.0.2"
 QUICKWIT_PORT=${QUICKWIT_PORT:-7280}
 QUICKWIT_INDEX=${QUICKWIT_INDEX:-wazuh-alerts}
 
@@ -73,7 +74,7 @@ if [ -f "$OSSEC_CONF" ]; then
     log_info "Checking configuration..."
 
     # Update Quickwit host if needed
-    if grep -q "quickwit-server" "$OSSEC_CONF" 2>/dev/null; then
+    if grep -q "quickwit" "$OSSEC_CONF" 2>/dev/null; then
         log_info "Quickwit configuration found in ossec.conf"
     else
         log_warning "Quickwit configuration not found, using default settings"
@@ -89,7 +90,7 @@ RETRY_INTERVAL=2
 RETRY_COUNT=0
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if curl -sf "http://${QUICKWIT_HOST}:${QUICKWIT_PORT}/health" > /dev/null 2>&1; then
+    if curl -sf "http://${QUICKWIT_HOST}:${QUICKWIT_PORT}/api/v1/cluster" > /dev/null 2>&1; then
         log_success "Quickwit is ready!"
         break
     else

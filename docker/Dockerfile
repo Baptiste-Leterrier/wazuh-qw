@@ -3,7 +3,7 @@
 # Multi-stage build for optimized image size
 
 # Build stage
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 # Build arguments
 ARG WAZUH_VERSION=4.9.0
@@ -127,7 +127,7 @@ RUN set -ex && \
     echo "========================================"
 
 # Runtime stage
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 # Runtime arguments
 ARG WAZUH_VERSION=4.9.0
