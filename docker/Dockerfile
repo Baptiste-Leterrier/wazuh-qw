@@ -238,6 +238,3 @@ VOLUME ["/var/ossec/logs", "/var/ossec/etc", "/var/ossec/queue", "/var/ossec/sta
 
 # Entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
-# Default command
-CMD ["start"]
