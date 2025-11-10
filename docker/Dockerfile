@@ -67,6 +67,7 @@ WORKDIR /build
 COPY src/ /build/src/
 COPY etc/ /build/etc/
 COPY framework/ /build/framework/
+COPY api/ /build/api/
 COPY VERSION.json /build/
 COPY install.sh /build/
 COPY gen_ossec.sh /build/
@@ -119,6 +120,15 @@ RUN set -ex && \
     ./install.sh || { \
         echo "ERROR: Installation failed"; \
         cat /var/ossec/logs/ossec.log 2>/dev/null || true; \
+        exit 1; \
+    } && \
+    echo "" && \
+    echo "========================================" && \
+    echo "Installing Wazuh API..." && \
+    echo "========================================" && \
+    cd /build/api && \
+    make install INSTALLDIR=/var/ossec || { \
+        echo "ERROR: API installation failed"; \
         exit 1; \
     } && \
     echo "" && \
