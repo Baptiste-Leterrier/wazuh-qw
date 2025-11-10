@@ -124,10 +124,27 @@ RUN set -ex && \
     } && \
     echo "" && \
     echo "========================================" && \
+    echo "Installing Python environment..." && \
+    echo "========================================" && \
+    cd /build/src && \
+    make install_python INSTALLDIR=/var/ossec || { \
+        echo "ERROR: Python installation failed"; \
+        exit 1; \
+    } && \
+    echo "" && \
+    echo "========================================" && \
+    echo "Installing Wazuh Framework..." && \
+    echo "========================================" && \
+    make install_framework INSTALLDIR=/var/ossec WAZUH_GROUP=ossec || { \
+        echo "ERROR: Framework installation failed"; \
+        exit 1; \
+    } && \
+    echo "" && \
+    echo "========================================" && \
     echo "Installing Wazuh API..." && \
     echo "========================================" && \
     cd /build/api && \
-    make install INSTALLDIR=/var/ossec || { \
+    make install INSTALLDIR=/var/ossec WAZUH_GROUP=ossec || { \
         echo "ERROR: API installation failed"; \
         exit 1; \
     } && \
