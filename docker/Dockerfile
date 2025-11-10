@@ -217,9 +217,12 @@ COPY --from=builder /var/ossec /var/ossec
 # Copy framework (Python SDK)
 COPY --from=builder /build/framework /var/ossec/framework
 
-# Create Wazuh user and group if they don't exist
+# Create Wazuh user and groups if they don't exist
+# Note: Both ossec and wazuh groups are needed because the build stage
+# installs framework/API with WAZUH_GROUP=wazuh
 RUN groupadd -r ossec 2>/dev/null || true && \
-    useradd -r -g ossec -d /var/ossec -s /sbin/nologin ossec 2>/dev/null || true
+    groupadd -r wazuh 2>/dev/null || true && \
+    useradd -r -g ossec -G wazuh -d /var/ossec -s /sbin/nologin ossec 2>/dev/null || true
 
 # Create necessary directories
 RUN mkdir -p \
@@ -237,13 +240,17 @@ RUN mkdir -p \
     /var/ossec/var/run
 
 # Set proper permissions
+# Files are owned by ossec:ossec, but ossec user is also member of wazuh group
 RUN chown -R ossec:ossec /var/ossec && \
     chmod -R 750 /var/ossec/logs \
                   /var/ossec/queue \
                   /var/ossec/stats \
                   /var/ossec/tmp \
                   /var/ossec/var && \
-    chmod +x /var/ossec/bin/* 2>/dev/null || true
+    chmod +x /var/ossec/bin/* 2>/dev/null || true && \
+    # Ensure API and framework directories have proper group access
+    find /var/ossec/api -type d -exec chmod g+rx {} \; 2>/dev/null || true && \
+    find /var/ossec/framework -type d -exec chmod g+rx {} \; 2>/dev/null || true
 
 # Copy entrypoint and healthcheck scripts
 COPY docker/scripts/entrypoint.sh /usr/local/bin/
