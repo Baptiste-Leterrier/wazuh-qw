@@ -7,7 +7,7 @@ FROM ubuntu:22.04 AS builder
 
 # Build arguments
 ARG WAZUH_VERSION=4.9.0
-ARG BUILD_JOBS=2
+ARG BUILD_JOBS=4
 ARG BUILD_DEBUG=0
 ARG BUILD_TARGET=server
 
@@ -17,7 +17,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     BUILD_JOBS=${BUILD_JOBS} \
     BUILD_DEBUG=${BUILD_DEBUG}
 
-# Install ALL build dependencies (comprehensive list)
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -47,23 +47,15 @@ RUN apt-get update && apt-get install -y \
     automake \
     libtool \
     ca-certificates \
-    libcurl4-openssl-dev \
-    libreadline-dev \
-    libpam0g-dev \
-    libdb-dev \
-    libaudit-dev \
-    libgtest-dev \
-    libgmock-dev \
-    libboost-all-dev \
-    uuid-dev \
-    libpopt-dev \
-    rpm \
     && rm -rf /var/lib/apt/lists/*
+
+# Note: librocksdb-dev might not be available, we'll build from source
+# RocksDB will be built by Wazuh's make deps
 
 # Set working directory
 WORKDIR /build
 
-# Copy only necessary files for build
+# Copy only necessary files first (for better caching)
 COPY src/ /build/src/
 COPY etc/ /build/etc/
 COPY framework/ /build/framework/
@@ -77,32 +69,20 @@ RUN chmod +x /build/*.sh
 # Build Wazuh with Quickwit support
 RUN set -ex && \
     cd /build/src && \
-    echo "========================================" && \
-    echo "Downloading external dependencies..." && \
-    echo "========================================" && \
+    echo "=== Downloading external dependencies ===" && \
     make deps TARGET=${BUILD_TARGET} || { \
         echo "ERROR: Failed to download dependencies"; \
-        echo "This usually means network issues or missing tools"; \
         exit 1; \
     } && \
-    echo "" && \
-    echo "========================================" && \
-    echo "Building Wazuh (this takes 20-60 min)..." && \
-    echo "Using ${BUILD_JOBS} parallel jobs" && \
-    echo "========================================" && \
-    # Reduce parallel jobs to avoid memory issues
+    echo "=== Building Wazuh ===" && \
     make TARGET=${BUILD_TARGET} DEBUG=${BUILD_DEBUG} build -j${BUILD_JOBS} || { \
         echo "ERROR: Build failed"; \
-        echo "Check if you have enough RAM (need 4GB+)"; \
-        echo "Try reducing BUILD_JOBS in .env file"; \
         exit 1; \
     } && \
-    echo "" && \
-    echo "========================================" && \
-    echo "Installing Wazuh..." && \
-    echo "========================================" && \
+    echo "=== Installing Wazuh ===" && \
     cd /build && \
     mkdir -p /var/ossec && \
+    # Set all required environment variables for non-interactive install
     export USER_LANGUAGE="en" && \
     export USER_NO_STOP="y" && \
     export USER_INSTALL_TYPE="${BUILD_TARGET}" && \
@@ -120,10 +100,7 @@ RUN set -ex && \
         cat /var/ossec/logs/ossec.log 2>/dev/null || true; \
         exit 1; \
     } && \
-    echo "" && \
-    echo "========================================" && \
-    echo "Build completed successfully!" && \
-    echo "========================================"
+    echo "=== Build completed successfully ==="
 
 # Runtime stage
 FROM ubuntu:22.04
@@ -171,32 +148,29 @@ RUN apt-get update && apt-get install -y \
     net-tools \
     iproute2 \
     ca-certificates \
-    libcurl4 \
-    libpam0g \
-    libdb5.3 \
-    libaudit1 \
-    uuid-runtime \
-    libpopt0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-RUN pip3 install --no-cache-dir requests 2>/dev/null || \
+# Use --break-system-packages for newer Python versions
+RUN pip3 install --no-cache-dir requests || \
     pip3 install --no-cache-dir --break-system-packages requests
 
 # Copy Wazuh installation from builder
 COPY --from=builder /var/ossec /var/ossec
 
-# Copy framework (Python SDK)
+# Copy framework (Python SDK) - may already be in /var/ossec, but ensure it's there
 COPY --from=builder /build/framework /var/ossec/framework
 
 # Create Wazuh user and group if they don't exist
+# The install.sh should have created them, but ensure they exist
 RUN groupadd -r ossec 2>/dev/null || true && \
     useradd -r -g ossec -d /var/ossec -s /sbin/nologin ossec 2>/dev/null || true
 
-# Create necessary directories
+# Create necessary directories (may already exist from builder)
 RUN mkdir -p \
     /var/ossec/logs \
     /var/ossec/etc \
+    /var/ossec/queue \
     /var/ossec/queue/alerts \
     /var/ossec/queue/rids \
     /var/ossec/queue/fts \
@@ -215,6 +189,7 @@ RUN chown -R ossec:ossec /var/ossec && \
                   /var/ossec/stats \
                   /var/ossec/tmp \
                   /var/ossec/var && \
+    # Ensure binaries are executable
     chmod +x /var/ossec/bin/* 2>/dev/null || true
 
 # Copy entrypoint and healthcheck scripts
@@ -223,6 +198,11 @@ COPY docker/scripts/healthcheck.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/healthcheck.sh
 
 # Expose ports
+# 55000: API
+# 1514: Agent communication (TCP)
+# 1514: Agent communication (UDP)
+# 1515: Agent enrollment
+# 1516: Cluster communication
 EXPOSE 55000 1514/tcp 1514/udp 1515 1516
 
 # Health check
@@ -238,5 +218,5 @@ VOLUME ["/var/ossec/logs", "/var/ossec/etc", "/var/ossec/queue", "/var/ossec/sta
 # Entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Default command
+# Default command (the entrypoint will handle starting)
 CMD ["start"]
