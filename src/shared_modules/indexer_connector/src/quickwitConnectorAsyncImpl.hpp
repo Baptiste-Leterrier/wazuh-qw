@@ -283,16 +283,24 @@ public:
         try
         {
             const auto server = m_selector->getNext();
-            std::string url = server + "/api/v1/indexes";
+            std::string url = std::string(server) + "/api/v1/indexes";
 
-            auto response = m_httpRequest->post(url, indexConfig.dump(), m_secureCommunication);
-
-            if (response.m_error)
+            const auto onSuccess = [index](const std::string& response)
             {
-                throw QuickwitConnectorException("Failed to create index: " + response.m_error.message());
-            }
+                logInfo(QW_NAME, "Created Quickwit index: %s", std::string(index).c_str());
+                logDebug2(QW_NAME, "Create index response: %s", response.c_str());
+            };
 
-            logInfo(QW_NAME, "Created Quickwit index: %s", std::string(index).c_str());
+            const auto onError = [index](const std::string& error, const long statusCode, const std::string& responseBody)
+            {
+                logError(QW_NAME, "Failed to create index %s: %s (status: %ld, body: %s)",
+                         std::string(index).c_str(), error.c_str(), statusCode, responseBody.c_str());
+            };
+
+            m_httpRequest->post(
+                RequestParameters {.url = HttpURL(url), .data = indexConfig.dump(), .secureCommunication = m_secureCommunication},
+                PostRequestParameters {.onSuccess = onSuccess, .onError = onError},
+                {});
         }
         catch (const std::exception& e)
         {
@@ -367,34 +375,47 @@ private:
         {
             const auto server = m_selector->getNext();
             // Quickwit ingest endpoint: POST /api/v1/<index>/ingest
-            std::string url = server + "/api/v1/" + index + "/ingest?commit=auto";
+            std::string url = std::string(server) + "/api/v1/" + index + "/ingest?commit=auto";
 
-            auto response = m_httpRequest->post(url, payload, m_secureCommunication);
+            // Capture payload and boundaries for the success callback
+            auto payloadCopy = payload;
+            auto boundariesCopy = boundaries;
 
-            if (response.m_error)
+            const auto onSuccess = [this, index, payloadCopy = std::move(payloadCopy),
+                                   boundariesCopy = std::move(boundariesCopy)](const std::string& response) mutable
             {
-                logError(QW_NAME, "Failed to send data to Quickwit: %s", response.m_error.message().c_str());
-                m_selector->setNextAvailable();
-                return;
-            }
+                // Process response asynchronously
+                m_loggerProcessor->push(QuickwitResponse(std::move(payloadCopy),
+                                                         std::move(boundariesCopy),
+                                                         std::string(response),
+                                                         std::string(index)));
 
-            // Process response asynchronously
-            m_loggerProcessor->push(QuickwitResponse(std::move(payload),
-                                                     std::move(boundaries),
-                                                     std::move(response.m_response),
-                                                     std::string(index)));
+                m_successCount++;
+                if (m_successCount >= MaxSuccessCount)
+                {
+                    // Reset success counter after threshold
+                    m_successCount = 0;
+                }
+            };
 
-            m_successCount++;
-            if (m_successCount >= MaxSuccessCount)
+            const auto onError = [this, index](const std::string& error, const long statusCode, const std::string& responseBody)
             {
-                m_selector->reportServerHealthy();
-                m_successCount = 0;
-            }
+                logError(QW_NAME, "Failed to send data to Quickwit index %s: %s (status: %ld)",
+                         index.c_str(), error.c_str(), statusCode);
+                if (!responseBody.empty())
+                {
+                    logDebug2(QW_NAME, "Response body: %s", responseBody.c_str());
+                }
+            };
+
+            m_httpRequest->post(
+                RequestParameters {.url = HttpURL(url), .data = payload, .secureCommunication = m_secureCommunication},
+                PostRequestParameters {.onSuccess = onSuccess, .onError = onError},
+                {});
         }
         catch (const std::exception& e)
         {
             logError(QW_NAME, "Exception while sending to Quickwit: %s", e.what());
-            m_selector->setNextAvailable();
         }
     }
 };
