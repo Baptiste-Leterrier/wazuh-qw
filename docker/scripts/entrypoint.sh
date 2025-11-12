@@ -61,7 +61,7 @@ mkdir -p \
 
 # Set permissions
 log_info "Setting permissions..."
-chown -R ossec:ossec \
+chown -R wazuh:wazuh \
     ${WAZUH_HOME}/logs \
     ${WAZUH_HOME}/queue \
     ${WAZUH_HOME}/stats \

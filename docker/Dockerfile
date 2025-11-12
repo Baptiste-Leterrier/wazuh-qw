@@ -166,8 +166,8 @@ LABEL maintainer="Wazuh Inc." \
 
 # Set environment variables
 ENV WAZUH_HOME=/var/ossec \
-    WAZUH_USER=ossec \
-    WAZUH_GROUP=ossec \
+    WAZUH_USER=wazuh \
+    WAZUH_GROUP=wazuh \
     DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     QUICKWIT_HOST=quickwit-server \
@@ -220,8 +220,10 @@ COPY --from=builder /build/framework /var/ossec/framework
 # Create Wazuh user and groups if they don't exist
 # Note: Both ossec and wazuh groups are needed because the build stage
 # installs framework/API with WAZUH_GROUP=wazuh
+# The wazuh user is the primary user (binaries are compiled to use 'wazuh' by default)
 RUN groupadd -r ossec 2>/dev/null || true && \
     groupadd -r wazuh 2>/dev/null || true && \
+    useradd -r -g wazuh -G ossec -d /var/ossec -s /sbin/nologin wazuh 2>/dev/null || true && \
     useradd -r -g ossec -G wazuh -d /var/ossec -s /sbin/nologin ossec 2>/dev/null || true
 
 # Create necessary directories
@@ -240,8 +242,9 @@ RUN mkdir -p \
     /var/ossec/var/run
 
 # Set proper permissions
-# Files are owned by ossec:ossec, but ossec user is also member of wazuh group
-RUN chown -R ossec:ossec /var/ossec && \
+# Files are owned by wazuh:wazuh (binaries run as wazuh user by default)
+# ossec user also has access via group membership
+RUN chown -R wazuh:wazuh /var/ossec && \
     chmod -R 750 /var/ossec/logs \
                   /var/ossec/queue \
                   /var/ossec/stats \
