@@ -202,8 +202,10 @@ public:
             .sslKey(sslKey)
             .caRootCertificate(caRootCertificate);
 
-        m_selector =
-            selector ? std::move(selector) : std::make_unique<TSelector>(config.at("hosts"), 10, m_secureCommunication);
+        // Quickwit uses /health/livez endpoint for health checks
+        m_selector = selector ? std::move(selector)
+                              : std::make_unique<TSelector>(
+                                    config.at("hosts"), 10, m_secureCommunication, nullptr, "/health/livez");
 
         // Initialize logger processor for handling responses
         m_loggerProcessor = std::make_unique<ThreadLoggerQueue>(
