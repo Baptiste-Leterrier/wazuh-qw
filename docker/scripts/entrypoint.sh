@@ -140,29 +140,22 @@ else
     # Default: start Wazuh in foreground
     log_info "Starting Wazuh control process..."
 
-    # Start Wazuh
-    ${WAZUH_HOME}/bin/wazuh-control start
+    # Run wazuh-control and capture its output
+    output="$(${WAZUH_HOME}/bin/wazuh-control start 2>&1)"
+    echo "$output"
 
-    # Check if Wazuh started successfully
-    sleep 5
-    if ${WAZUH_HOME}/bin/wazuh-control status > /dev/null 2>&1; then
-        log_success "Wazuh Manager started successfully"
+    # Determine success by matching "Completed."
+    if echo "$output" | grep -q "Completed."; then
+        log_success "Wazuh Control started successfully"
         log_info "Quickwit endpoint: http://${QUICKWIT_HOST}:${QUICKWIT_PORT}"
         log_info "Quickwit index: ${QUICKWIT_INDEX}"
     else
-        log_error "Wazuh Manager failed to start"
-        ${WAZUH_HOME}/bin/wazuh-control status
+        log_error "Wazuh Control failed to start"
+        echo "$output"
         exit 1
     fi
 
-    # Keep container running and tail logs
-    log_info "Tailing logs... (press Ctrl+C to stop)"
-    tail -f ${WAZUH_HOME}/logs/ossec.log &
-    TAIL_PID=$!
-
-    # Trap signals for graceful shutdown
-    trap 'log_info "Shutting down Wazuh..."; ${WAZUH_HOME}/bin/wazuh-control stop; kill $TAIL_PID 2>/dev/null || true; exit 0' SIGTERM SIGINT
-
-    # Wait for tail process
-    wait $TAIL_PID
-fi
+    # Keep the container alive by tailing logs
+    log_info "Tailing Wazuh logs..."
+    exec tail -f ${WAZUH_HOME}/logs/ossec.log
+    fi

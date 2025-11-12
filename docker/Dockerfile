@@ -166,8 +166,8 @@ LABEL maintainer="Wazuh Inc." \
 
 # Set environment variables
 ENV WAZUH_HOME=/var/ossec \
-    WAZUH_USER=ossec \
-    WAZUH_GROUP=ossec \
+    WAZUH_USER=wazuh \
+    WAZUH_GROUP=wazuh \
     DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     QUICKWIT_HOST=quickwit-server \
@@ -223,6 +223,11 @@ COPY --from=builder /build/framework /var/ossec/framework
 RUN groupadd -r ossec 2>/dev/null || true && \
     groupadd -r wazuh 2>/dev/null || true && \
     useradd -r -g ossec -G wazuh -d /var/ossec -s /sbin/nologin ossec 2>/dev/null || true
+
+RUN useradd -r -g wazuh -G wazuh -d /var/ossec -s /sbin/nologin wazuh 2>/dev/null || true
+RUN getent passwd wazuh
+RUN getent group wazuh
+    
 
 # Create necessary directories
 RUN mkdir -p \
