@@ -50,6 +50,7 @@ class TMonitoring final
     std::atomic<bool> m_stop {false};
     uint32_t m_interval {INTERVAL};
     THttpRequest* m_httpRequest;
+    std::string m_healthCheckEndpoint;
 
     /**
      * @brief Checks the health of a server.
@@ -70,10 +71,21 @@ class TMonitoring final
         serverStatus = false;
 
         // On success callback
-        const auto onSuccess = [&serverStatus](std::string response)
+        const auto onSuccess = [&serverStatus, this](std::string response)
         {
+            // Check if this is a Quickwit health check endpoint
+            if (m_healthCheckEndpoint.find("/health/livez") != std::string::npos)
+            {
+                // Quickwit /health/livez returns simple text "true" when healthy
+                // Trim whitespace and check if response is "true"
+                response.erase(0, response.find_first_not_of(" \t\n\r"));
+                response.erase(response.find_last_not_of(" \t\n\r") + 1);
+                serverStatus = (response == "true");
+                return;
+            }
+
             // Parse the response without throwing exceptions
-            // Response example:
+            // Response example (OpenSearch/Elasticsearch):
             // [
             //     {
             //         "epoch": "1726271464",
@@ -187,7 +199,7 @@ class TMonitoring final
 
         // Get the health of the server.
         thread_local std::string url;
-        url = serverAddress + "/_cat/health";
+        url = serverAddress + m_healthCheckEndpoint;
 
         m_httpRequest->get(RequestParameters {.url = HttpURL(url), .secureCommunication = authentication},
                            PostRequestParameters {.onSuccess = onSuccess, .onError = onError},
@@ -236,13 +248,16 @@ public:
      * @param interval Interval for monitoring.
      * @param authentication Object that provides secure communication.
      * @param httpRequest Optional HTTP request instance for dependency injection (for testing).
+     * @param healthCheckEndpoint Health check endpoint to use (default: "/_cat/health" for OpenSearch/Elasticsearch).
      */
     explicit TMonitoring(const std::vector<std::string>& serverAddresses,
                          const uint32_t interval = INTERVAL,
                          const SecureCommunication& authentication = {},
-                         THttpRequest* httpRequest = nullptr)
+                         THttpRequest* httpRequest = nullptr,
+                         std::string healthCheckEndpoint = "/_cat/health")
         : m_interval(interval)
         , m_httpRequest(httpRequest ? httpRequest : &THttpRequest::instance())
+        , m_healthCheckEndpoint(std::move(healthCheckEndpoint))
     {
 
         // First, initialize the status of the servers.
